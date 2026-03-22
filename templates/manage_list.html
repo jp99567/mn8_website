@@ -19,16 +19,21 @@
         <table>
             <thead>
                 <tr>
+                    <th></th>
                     <th>Od</th>
                     <th>Do</th>
                     <th>link</th>
+                    <th></th>
                     <th>popis</th>
-                    <th>Actions</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in rows %}
                 <tr class="row-state-{{ row['row_state'] }}">
+                    <td data-label="">
+                        <a class="button" href="{{ url_for('edit_record_view', record_id=row['record_id']) }}">Edit</a>
+                    </td>
                     <td data-label="Od">{{ row['start_at']|datetime_display }}</td>
                     <td data-label="Do">{{ row['end_at']|datetime_display }}</td>
                     <td data-label="link">
@@ -36,18 +41,17 @@
                             <code>{{ row['link'] }}</code>
                         </a>
                     </td>
+                    <td data-label="">
+                        <button
+                            class="copy-button secondary"
+                            type="button"
+                            data-copy-text="{{ request.url_root.rstrip('/') }}/mn8/access/{{ row['link'] }}"
+                            data-copy-label="COPY"
+                        >COPY</button>
+                    </td>
                     <td data-label="popis">{{ row['description'] or '' }}</td>
-                    <td data-label="Actions">
-                        <div class="actions">
-                            <button
-                                class="copy-button secondary"
-                                type="button"
-                                data-copy-text="{{ request.url_root.rstrip('/') }}/mn8/access/{{ row['link'] }}"
-                                data-copy-label="COPY"
-                            >COPY</button>
-                            <a href="{{ url_for('edit_record_view', record_id=row['record_id']) }}">Edit</a>
-                            <a class="secondary" href="{{ url_for('delete_record_view', record_id=row['record_id']) }}">Delete</a>
-                        </div>
+                    <td data-label="">
+                        <a class="button secondary" href="{{ url_for('delete_record_view', record_id=row['record_id']) }}">Delete</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -58,7 +62,7 @@
         {% endif %}
 
         <div>
-            <a href="{{ url_for('create_record_view') }}">Create New Item</a>
+            <a class="button" href="{{ url_for('create_record_view') }}">Create New Item</a>
         </div>
     </div>
 </section>
