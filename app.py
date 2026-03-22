@@ -3,6 +3,8 @@ import re
 import secrets
 import string
 import logging
+import shlex
+import subprocess
 from datetime import datetime, timedelta
 
 import psycopg
@@ -22,6 +24,24 @@ FROM_COLUMN = "mn8_from"
 TO_COLUMN = "mn8_to"
 DESCRIPTION_COLUMN = "mn8_desc"
 DEFAULT_LOG_FILE = "mn8_manage.log"
+DEFAULT_BRANA_COMMAND = "mosquitto_pub -h linksys -t rb/ctrl/dev/Brana -m 1"
+DEFAULT_PAVLAC_COMMAND = "mosquitto_pub -h linksys -t rb/ctrl/dev/DverePavlac -m 1"
+DEFAULT_SIMULATION_MARKER = "simulation"
+
+ACCESS_ACTIONS = {
+    "brana": {
+        "label": "FRONT DOOR",
+        "description": "Front door onto pavement. Press button to open.",
+        "command_env": "MN8_CMD_BRANA",
+        "default_command": DEFAULT_BRANA_COMMAND,
+    },
+    "pavlac": {
+        "label": "BALCONY ACCESS",
+        "description": "Balcony door. Press the button. Pull door slightly then push to open.",
+        "command_env": "MN8_CMD_PAVLAC",
+        "default_command": DEFAULT_PAVLAC_COMMAND,
+    },
+}
 
 
 def create_audit_logger():
@@ -194,6 +214,29 @@ def get_record_for_user(record_id, user_name):
     return run_query(query, (record_id, user_name), fetchone=True)
 
 
+def get_record_by_link(link_value):
+    query = sql.SQL(
+        """
+        SELECT {pk} AS record_id,
+               {user_column} AS user_name,
+               {from_column} AS start_at,
+               {to_column} AS end_at,
+               link,
+               {description_column} AS description
+        FROM {table}
+        WHERE link = %s
+        """
+    ).format(
+        pk=get_primary_key_identifier(),
+        user_column=sql.Identifier(USER_COLUMN),
+        from_column=sql.Identifier(FROM_COLUMN),
+        to_column=sql.Identifier(TO_COLUMN),
+        description_column=sql.Identifier(DESCRIPTION_COLUMN),
+        table=get_table_identifier(),
+    )
+    return run_query(query, (link_value,), fetchone=True)
+
+
 def link_exists(link_value):
     query = sql.SQL(
         "SELECT 1 FROM {table} WHERE link = %s LIMIT 1"
@@ -256,6 +299,27 @@ def delete_record(record_id, user_name):
         user_column=sql.Identifier(USER_COLUMN),
     )
     run_query(query, (record_id, user_name), commit=True)
+
+
+def simulation_enabled():
+    marker_path = os.environ.get("MN8_SIMULATION_MARKER", DEFAULT_SIMULATION_MARKER)
+    return os.path.exists(marker_path)
+
+
+def get_access_command(action_name):
+    action_config = ACCESS_ACTIONS.get(action_name)
+    if action_config is None:
+        raise RuntimeError(f"Unknown access action: {action_name}")
+    return os.environ.get(action_config["command_env"], action_config["default_command"])
+
+
+def execute_access_action(action_name):
+    command = get_access_command(action_name)
+    if simulation_enabled():
+        return {"simulation": True, "command": command}
+
+    subprocess.run(shlex.split(command), check=True)
+    return {"simulation": False, "command": command}
 
 
 def now_local():
@@ -388,6 +452,14 @@ def build_request_details():
     }
 
 
+def get_access_record_state(record):
+    return get_row_state(record["start_at"], record["end_at"])
+
+
+def render_access_error(status_code, title, detail):
+    return render_template("access_error.html", title=title, detail=detail, status_code=status_code), status_code
+
+
 def render_error(status_code, title, detail):
     return render_template("error.html", title=title, detail=detail, status_code=status_code), status_code
 
@@ -443,6 +515,80 @@ def manage_index():
 @app.route("/mn8/manage/show_info")
 def show_info():
     return render_template("show_info.html", **build_request_details())
+
+
+@app.route("/mn8/access/<token>", methods=["GET", "POST"])
+def public_access(token):
+    record = get_record_by_link(token)
+    if record is None:
+        log_crud_action("access-denied", None, reason="token-not-found", token=token, remote_addr=request.remote_addr)
+        return render_access_error(404, "error", "Access link was not found.")
+
+    record_state = get_access_record_state(record)
+    if record_state != "active":
+        log_crud_action(
+            "access-denied",
+            record["user_name"],
+            reason=f"inactive-{record_state}",
+            token=token,
+            record_id=record["record_id"],
+            remote_addr=request.remote_addr,
+        )
+        return render_access_error(403, "error", "This access link is outside its allowed time window.")
+
+    action_message = None
+    action_kind = None
+
+    if request.method == "POST":
+        action_name = request.form.get("open_door", "").strip().lower()
+        action_config = ACCESS_ACTIONS.get(action_name)
+        if action_config is None:
+            action_message = "Unknown action."
+            action_kind = "error"
+        else:
+            try:
+                action_result = execute_access_action(action_name)
+                if action_result["simulation"]:
+                    action_message = f"Simulation: {action_config['label']} was requested."
+                else:
+                    action_message = f"{action_config['label']} command sent."
+                action_kind = "notice"
+                log_crud_action(
+                    "access-open",
+                    record["user_name"],
+                    token=token,
+                    record_id=record["record_id"],
+                    door=action_name,
+                    remote_addr=request.remote_addr,
+                    simulation=action_result["simulation"],
+                )
+            except (RuntimeError, subprocess.CalledProcessError) as error:
+                action_message = f"Action failed: {error}"
+                action_kind = "error"
+                log_crud_action(
+                    "access-open-failed",
+                    record["user_name"],
+                    token=token,
+                    record_id=record["record_id"],
+                    door=action_name,
+                    remote_addr=request.remote_addr,
+                )
+    else:
+        log_crud_action(
+            "access-view",
+            record["user_name"],
+            token=token,
+            record_id=record["record_id"],
+            remote_addr=request.remote_addr,
+        )
+
+    return render_template(
+        "access_link.html",
+        record=record,
+        actions=ACCESS_ACTIONS,
+        action_message=action_message,
+        action_kind=action_kind,
+    )
 
 
 @app.route("/mn8/manage/create", methods=["GET", "POST"])
