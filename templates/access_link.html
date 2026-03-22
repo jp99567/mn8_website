@@ -1,17 +1,15 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>open door</title>
     <style>
-        .action-button {
+        .large-button {
             padding: 12px 70px;
             font-size: 2em;
             border-radius: 10px;
             border: 2px solid black;
-            background: buttonface;
-            color: buttontext;
         }
 
         hr {
@@ -24,20 +22,20 @@
     <hr/>
     <p>Front door onto pavement. Press button to open.</p>
     <form action="" method="post">
-        <button class="action-button" name="open_door" value="brana">FRONT DOOR</button>
+        <button class="large-button" name="open_door" value="brana">FRONT DOOR</button>
     </form>
     <hr/>
     <p>Balcony door. Press the button. Pull door slightly then push to open.</p>
     <form action="" method="post">
-        <button class="action-button" name="open_door" value="pavlac">BALCONY ACCESS</button>
+        <button class="large-button" name="open_door" value="pavlac">BALCONY ACCESS</button>
     </form>
     <hr/>
-        {% if action_message %}
-        <p><strong>{{ action_message }}</strong></p>
-        <hr/>
-        {% endif %}
-    <p>{{ record['description'] or 'No description.' }}</p>
+    {% if action_message %}
+    <p><strong>{{ action_message }}</strong></p>
+    <hr/>
+    {% endif %}
     <p>Active from: {{ record['start_at']|datetime_display }}</p>
     <p>Active until: {{ record['end_at']|datetime_display }}</p>
+    <hr/>
 </body>
 </html>

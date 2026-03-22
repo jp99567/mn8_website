@@ -456,6 +456,14 @@ def get_access_record_state(record):
     return get_row_state(record["start_at"], record["end_at"])
 
 
+def build_access_inactive_detail(record, record_state):
+    if record_state == "past":
+        return f"This access link expired at {format_datetime_for_display(record['end_at'])}."
+    if record_state == "future":
+        return f"This access link will become active at {format_datetime_for_display(record['start_at'])}."
+    return "This access link is invalid."
+
+
 def render_access_error(status_code, title, detail):
     return render_template("access_error.html", title=title, detail=detail, status_code=status_code), status_code
 
@@ -534,7 +542,11 @@ def public_access(token):
             record_id=record["record_id"],
             remote_addr=request.remote_addr,
         )
-        return render_access_error(403, "error", "This access link is outside its allowed time window.")
+        return render_access_error(
+            403,
+            "error",
+            build_access_inactive_detail(record, record_state),
+        )
 
     action_message = None
     action_kind = None
