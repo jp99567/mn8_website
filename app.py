@@ -227,7 +227,8 @@ def get_record_by_link(link_value):
                {from_column} AS start_at,
                {to_column} AS end_at,
                link,
-               {description_column} AS description
+               {description_column} AS description,
+               {welcome_text_column} AS welcome_text
         FROM {table}
         WHERE link = %s
         """
@@ -237,6 +238,7 @@ def get_record_by_link(link_value):
         from_column=sql.Identifier(FROM_COLUMN),
         to_column=sql.Identifier(TO_COLUMN),
         description_column=sql.Identifier(DESCRIPTION_COLUMN),
+        welcome_text_column=sql.Identifier(WELCOME_TEXT_COLUMN),
         table=get_table_identifier(),
     )
     return run_query(query, (link_value,), fetchone=True)

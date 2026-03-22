@@ -25,6 +25,10 @@
 <body>
     <h2>Door Opener</h2>
     <hr/>
+    {% if record['welcome_text'] %}
+    <p>{{ record['welcome_text'] }}</p>
+    <hr/>
+    {% endif %}
     <p>Front door onto pavement. Press button to open.</p>
     <form action="" method="post">
         <button class="large-button" name="open_door" value="brana">FRONT DOOR</button>
