@@ -32,7 +32,7 @@ Create a virtual environment, install dependencies, export environment variables
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 export DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DBNAME'
 export MN8_DEV_AUTH_USER='testuser'
 export MN8_LOG_FILE='mn8_manage.log'
@@ -59,10 +59,24 @@ For the public token page use:
 http://127.0.0.1:5000/mn8/access/<token>
 ```
 
+## Run with Gunicorn
+
+For deployment, run Gunicorn through the same Python interpreter as the virtual environment:
+
+```sh
+cd /opt/webapp/mn8_website
+. .venv/bin/activate
+export DATABASE_URL='postgresql://postgres@linksys:5432/rbdb'
+python -m gunicorn -w 1 -b 127.0.0.1:7780 app:app
+```
+
+This avoids accidentally using a system `gunicorn` executable with a different Python environment.
+
 ## Notes
 
 - The existing PostgreSQL table is assumed to already exist.
 - The application filters rows by the authenticated user forwarded from nginx.
-- Physical database columns are expected to be `mn8_user`, `mn8_from`, `mn8_to`, and `mn8_desc`.
+- Physical database columns are expected to be `mn8_user`, `mn8_from`, `mn8_to`, `mn8_desc`, and `welcome_text`.
 - CRUD actions are appended to the log file configured by `MN8_LOG_FILE`.
 - Public access actions are allowed only when the token exists and the current time falls within its active period.
+- On platforms such as OpenWrt, prefer plain `psycopg` instead of `psycopg[binary]`, because binary wheels may be unavailable.
