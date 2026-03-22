@@ -79,14 +79,6 @@
             white-space: nowrap;
         }
 
-        nav {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 18px;
-        }
-
-        nav a,
         .button,
         button {
             display: inline-flex;
@@ -103,11 +95,25 @@
             cursor: pointer;
         }
 
-        nav a.secondary,
         .button.secondary,
         button.secondary {
             background: transparent;
             color: var(--accent-strong);
+        }
+
+        .button.danger,
+        button.danger {
+            border-color: #7d1f1f;
+            background: #7d1f1f;
+            color: #fff;
+        }
+
+        .button.danger:hover,
+        button.danger:hover,
+        .button.danger:focus-visible,
+        button.danger:focus-visible {
+            border-color: #5c1616;
+            background: #5c1616;
         }
 
         a.token-link {
@@ -302,15 +308,9 @@
         <header class="masthead">
             <div>
                 <h1>{% block page_heading %}MN8 Manage{% endblock %}</h1>
-                <p class="subtitle">Pure HTML5 Flask application behind nginx authentication.</p>
             </div>
             <div class="user-badge">User: {{ current_user_name or 'not authenticated' }}</div>
         </header>
-
-        <nav>
-            <a href="{{ url_for('manage_index') }}">Main Page</a>
-            <a class="secondary" href="{{ url_for('show_info') }}">Show Info</a>
-        </nav>
 
         {% block content %}{% endblock %}
     </div>
