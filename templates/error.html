@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}MN8 Manage | {{ title }}{% endblock %}
+{% block page_heading %}{{ title }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="errors">
+        <strong>Status {{ status_code }}</strong>
+        <p style="margin-top: 8px;">{{ detail }}</p>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,451 @@
+import os
+import re
+import secrets
+import string
+from datetime import datetime, timedelta
+
+import psycopg
+from psycopg import sql
+from psycopg.rows import dict_row
+from flask import Flask, redirect, render_template, request, url_for
+
+
+app = Flask(__name__)
+
+ALPHANUMERIC = string.ascii_letters + string.digits
+DEFAULT_TABLE_NAME = "mn8_brana_access"
+DEFAULT_PRIMARY_KEY_COLUMN = "id"
+IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+USER_COLUMN = "mn8_user"
+FROM_COLUMN = "mn8_from"
+TO_COLUMN = "mn8_to"
+DESCRIPTION_COLUMN = "mn8_desc"
+
+
+def validate_identifier(identifier):
+    if not IDENTIFIER_RE.fullmatch(identifier):
+        raise RuntimeError(f"Invalid SQL identifier: {identifier}")
+    return identifier
+
+
+def build_identifier(path):
+    parts = path.split(".")
+    for part in parts:
+        validate_identifier(part)
+    return sql.SQL(".").join(sql.Identifier(part) for part in parts)
+
+
+def get_table_identifier():
+    table_name = os.environ.get("MN8_ACCESS_TABLE", DEFAULT_TABLE_NAME)
+    return build_identifier(table_name)
+
+
+def get_primary_key_identifier():
+    primary_key = os.environ.get("MN8_ACCESS_PK_COLUMN", DEFAULT_PRIMARY_KEY_COLUMN)
+    validate_identifier(primary_key)
+    return sql.Identifier(primary_key)
+
+
+def get_database_url():
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
+    return database_url
+
+
+def get_current_user():
+    user_name = request.headers.get("X-Authenticated-User")
+    if not user_name:
+        user_name = request.environ.get("REMOTE_USER")
+    if not user_name:
+        user_name = os.environ.get("MN8_DEV_AUTH_USER")
+    if not user_name:
+        return None
+    return user_name.strip() or None
+
+
+def require_current_user():
+    user_name = get_current_user()
+    if not user_name:
+        return None, render_error(
+            401,
+            "Authenticated user is missing.",
+            "The application expected nginx to forward X-Authenticated-User."
+        )
+    return user_name, None
+
+
+def connect_db():
+    return psycopg.connect(get_database_url(), row_factory=dict_row)
+
+
+def run_query(query, params=None, *, fetchone=False, fetchall=False, commit=False):
+    with connect_db() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(query, params or ())
+            result = None
+            if fetchone:
+                result = cursor.fetchone()
+            elif fetchall:
+                result = cursor.fetchall()
+            if commit:
+                connection.commit()
+            return result
+
+
+def list_records_for_user(user_name):
+    query = sql.SQL(
+        """
+        SELECT {pk} AS record_id,
+               {user_column} AS user_name,
+               {from_column} AS start_at,
+               {to_column} AS end_at,
+               link,
+               {description_column} AS description
+        FROM {table}
+        WHERE {user_column} = %s
+        ORDER BY {from_column} DESC, {pk} DESC
+        """
+    ).format(
+        pk=get_primary_key_identifier(),
+        user_column=sql.Identifier(USER_COLUMN),
+        from_column=sql.Identifier(FROM_COLUMN),
+        to_column=sql.Identifier(TO_COLUMN),
+        description_column=sql.Identifier(DESCRIPTION_COLUMN),
+        table=get_table_identifier(),
+    )
+    return run_query(query, (user_name,), fetchall=True)
+
+
+def get_record_for_user(record_id, user_name):
+    query = sql.SQL(
+        """
+        SELECT {pk} AS record_id,
+               {user_column} AS user_name,
+               {from_column} AS start_at,
+               {to_column} AS end_at,
+               link,
+               {description_column} AS description
+        FROM {table}
+        WHERE {pk} = %s AND {user_column} = %s
+        """
+    ).format(
+        pk=get_primary_key_identifier(),
+        user_column=sql.Identifier(USER_COLUMN),
+        from_column=sql.Identifier(FROM_COLUMN),
+        to_column=sql.Identifier(TO_COLUMN),
+        description_column=sql.Identifier(DESCRIPTION_COLUMN),
+        table=get_table_identifier(),
+    )
+    return run_query(query, (record_id, user_name), fetchone=True)
+
+
+def link_exists(link_value):
+    query = sql.SQL(
+        "SELECT 1 FROM {table} WHERE link = %s LIMIT 1"
+    ).format(table=get_table_identifier())
+    return run_query(query, (link_value,), fetchone=True) is not None
+
+
+def generate_unique_link():
+    for _ in range(20):
+        link_value = "".join(secrets.choice(ALPHANUMERIC) for _ in range(10))
+        if not link_exists(link_value):
+            return link_value
+    raise RuntimeError("Failed to generate a unique link after multiple attempts.")
+
+
+def insert_record(user_name, start_at, end_at, description):
+    query = sql.SQL(
+        """
+        INSERT INTO {table} ({user_column}, {from_column}, {to_column}, link, {description_column})
+        VALUES (%s, %s, %s, %s, %s)
+        """
+    ).format(
+        table=get_table_identifier(),
+        user_column=sql.Identifier(USER_COLUMN),
+        from_column=sql.Identifier(FROM_COLUMN),
+        to_column=sql.Identifier(TO_COLUMN),
+        description_column=sql.Identifier(DESCRIPTION_COLUMN),
+    )
+    run_query(query, (user_name, start_at, end_at, generate_unique_link(), description), commit=True)
+
+
+def update_record(record_id, user_name, start_at, end_at, description):
+    query = sql.SQL(
+        """
+        UPDATE {table}
+        SET {from_column} = %s,
+            {to_column} = %s,
+            {description_column} = %s
+        WHERE {pk} = %s AND {user_column} = %s
+        """
+    ).format(
+        pk=get_primary_key_identifier(),
+        table=get_table_identifier(),
+        user_column=sql.Identifier(USER_COLUMN),
+        from_column=sql.Identifier(FROM_COLUMN),
+        to_column=sql.Identifier(TO_COLUMN),
+        description_column=sql.Identifier(DESCRIPTION_COLUMN),
+    )
+    run_query(query, (start_at, end_at, description, record_id, user_name), commit=True)
+
+
+def delete_record(record_id, user_name):
+    query = sql.SQL(
+        "DELETE FROM {table} WHERE {pk} = %s AND {user_column} = %s"
+    ).format(
+        pk=get_primary_key_identifier(),
+        table=get_table_identifier(),
+        user_column=sql.Identifier(USER_COLUMN),
+    )
+    run_query(query, (record_id, user_name), commit=True)
+
+
+def now_local():
+    return datetime.now().replace(microsecond=0)
+
+
+def default_end_datetime(start_at):
+    return (start_at + timedelta(days=5)).replace(hour=23, minute=59, second=59, microsecond=0)
+
+
+def format_datetime_for_input(value):
+    if not value:
+        return ""
+    return value.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def format_datetime_for_display(value):
+    if not value:
+        return "-"
+    return value.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def parse_datetime_value(raw_value, label):
+    if not raw_value:
+        raise ValueError(f"Field {label} is required.")
+    try:
+        return datetime.fromisoformat(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"Field {label} must be a valid date and time.") from exc
+
+
+def build_form_data(record=None, submitted=None):
+    submitted = submitted or {}
+    if record is None:
+        start_at = now_local()
+        end_at = default_end_datetime(start_at)
+        return {
+            "od": submitted.get("od", format_datetime_for_input(start_at)),
+            "do": submitted.get("do", format_datetime_for_input(end_at)),
+            "popis": submitted.get("popis", ""),
+        }
+    return {
+        "od": submitted.get("od", format_datetime_for_input(record["start_at"])),
+        "do": submitted.get("do", format_datetime_for_input(record["end_at"])),
+        "popis": submitted.get("popis", record["description"] or ""),
+    }
+
+
+def validate_form(submitted):
+    errors = []
+    start_at = None
+    end_at = None
+
+    try:
+        start_at = parse_datetime_value(submitted.get("od", ""), "Od")
+    except ValueError as exc:
+        errors.append(str(exc))
+
+    try:
+        end_at = parse_datetime_value(submitted.get("do", ""), "Do")
+    except ValueError as exc:
+        errors.append(str(exc))
+
+    if start_at and end_at and end_at < start_at:
+        errors.append("Field Do must be later than or equal to Od.")
+
+    description = submitted.get("popis", "").strip()
+
+    return errors, start_at, end_at, description
+
+
+def build_request_details():
+    selected_headers = {
+        "Host": request.headers.get("Host"),
+        "X-Real-IP": request.headers.get("X-Real-IP"),
+        "X-Forwarded-For": request.headers.get("X-Forwarded-For"),
+        "X-Forwarded-Proto": request.headers.get("X-Forwarded-Proto"),
+        "X-Forwarded-Prefix": request.headers.get("X-Forwarded-Prefix"),
+        "X-Original-URI": request.headers.get("X-Original-URI"),
+        "X-Authenticated-User": request.headers.get("X-Authenticated-User"),
+        "User-Agent": request.headers.get("User-Agent"),
+    }
+
+    request_info = {
+        "method": request.method,
+        "scheme": request.scheme,
+        "host": request.host,
+        "path": request.path,
+        "full_path": request.full_path,
+        "url": request.url,
+        "base_url": request.base_url,
+        "url_root": request.url_root,
+        "remote_addr": request.remote_addr,
+        "query_string": request.query_string.decode("utf-8", errors="replace"),
+        "authenticated_user": get_current_user(),
+        "remote_user": request.environ.get("REMOTE_USER"),
+    }
+
+    return {
+        "request_info": request_info,
+        "selected_headers": selected_headers,
+        "all_headers": sorted(request.headers.items()),
+        "query_args": list(request.args.lists()),
+        "environ_info": {
+            "REMOTE_USER": request.environ.get("REMOTE_USER"),
+            "SCRIPT_NAME": request.environ.get("SCRIPT_NAME"),
+            "PATH_INFO": request.environ.get("PATH_INFO"),
+            "SERVER_NAME": request.environ.get("SERVER_NAME"),
+            "SERVER_PORT": request.environ.get("SERVER_PORT"),
+        },
+    }
+
+
+def render_error(status_code, title, detail):
+    return render_template("error.html", title=title, detail=detail, status_code=status_code), status_code
+
+
+@app.template_filter("datetime_display")
+def datetime_display_filter(value):
+    return format_datetime_for_display(value)
+
+
+@app.context_processor
+def inject_navigation_context():
+    return {
+        "current_user_name": get_current_user(),
+    }
+
+
+@app.errorhandler(404)
+def not_found(_error):
+    return render_error(404, "Page not found", "The requested page does not exist.")
+
+
+@app.errorhandler(RuntimeError)
+def runtime_error(error):
+    return render_error(500, "Configuration error", str(error))
+
+
+@app.route("/")
+def root():
+    return redirect(url_for("manage_index"))
+
+
+@app.route("/mn8/manage/")
+def manage_index():
+    user_name, error_response = require_current_user()
+    if error_response:
+        return error_response
+
+    rows = list_records_for_user(user_name)
+    return render_template(
+        "manage_list.html",
+        rows=rows,
+        message=request.args.get("message")
+    )
+
+
+@app.route("/mn8/manage/show_info")
+def show_info():
+    return render_template("show_info.html", **build_request_details())
+
+
+@app.route("/mn8/manage/create", methods=["GET", "POST"])
+def create_record_view():
+    user_name, error_response = require_current_user()
+    if error_response:
+        return error_response
+
+    form_data = build_form_data(submitted=request.form)
+    errors = []
+
+    if request.method == "POST":
+        errors, start_at, end_at, description = validate_form(request.form)
+        if not errors:
+            insert_record(user_name, start_at, end_at, description)
+            return redirect(url_for("manage_index", message="New item was created."))
+
+    return render_template(
+        "manage_form.html",
+        page_title="Create New Item",
+        submit_label="Create",
+        form_action=url_for("create_record_view"),
+        form_data=form_data,
+        errors=errors,
+        link_value=None,
+        cancel_url=url_for("manage_index")
+    )
+
+
+@app.route("/mn8/manage/<int:record_id>/edit", methods=["GET", "POST"])
+def edit_record_view(record_id):
+    user_name, error_response = require_current_user()
+    if error_response:
+        return error_response
+
+    record = get_record_for_user(record_id, user_name)
+    if record is None:
+        return render_error(404, "Record not found", "The selected record does not exist for the authenticated user.")
+
+    form_data = build_form_data(record=record, submitted=request.form)
+    errors = []
+
+    if request.method == "POST":
+        errors, start_at, end_at, description = validate_form(request.form)
+        if not errors:
+            update_record(record_id, user_name, start_at, end_at, description)
+            return redirect(url_for("manage_index", message="Item was updated."))
+
+    return render_template(
+        "manage_form.html",
+        page_title="Edit Item",
+        submit_label="Save Changes",
+        form_action=url_for("edit_record_view", record_id=record_id),
+        form_data=form_data,
+        errors=errors,
+        link_value=record["link"],
+        cancel_url=url_for("manage_index")
+    )
+
+
+@app.route("/mn8/manage/<int:record_id>/delete", methods=["GET", "POST"])
+def delete_record_view(record_id):
+    user_name, error_response = require_current_user()
+    if error_response:
+        return error_response
+
+    record = get_record_for_user(record_id, user_name)
+    if record is None:
+        return render_error(404, "Record not found", "The selected record does not exist for the authenticated user.")
+
+    if request.method == "POST":
+        delete_record(record_id, user_name)
+        return redirect(url_for("manage_index", message="Item was deleted."))
+
+    return render_template(
+        "delete_confirm.html",
+        record=record,
+        confirm_url=url_for("delete_record_view", record_id=record_id),
+        cancel_url=url_for("manage_index")
+    )
+
+
+if __name__ == "__main__":
+    app.run(
+        host=os.environ.get("FLASK_RUN_HOST", "0.0.0.0"),
+        port=int(os.environ.get("FLASK_RUN_PORT", "5000")),
+        debug=os.environ.get("FLASK_DEBUG", "1") == "1",
+    )

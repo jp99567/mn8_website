@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}MN8 Manage | Delete Item{% endblock %}
+{% block page_heading %}Delete Item{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="notice">
+        You are about to delete this record. This action cannot be undone.
+    </div>
+
+    <table>
+        <tbody>
+            <tr>
+                <th>Od</th>
+                <td>{{ record['start_at']|datetime_display }}</td>
+            </tr>
+            <tr>
+                <th>Do</th>
+                <td>{{ record['end_at']|datetime_display }}</td>
+            </tr>
+            <tr>
+                <th>link</th>
+                <td><code>{{ record['link'] }}</code></td>
+            </tr>
+            <tr>
+                <th>popis</th>
+                <td>{{ record['description'] or '' }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <form method="post" action="{{ confirm_url }}" style="margin-top: 18px;">
+        <div class="actions">
+            <button type="submit">Confirm Delete</button>
+            <a class="secondary" href="{{ cancel_url }}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

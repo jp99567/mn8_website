@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}MN8 Manage | Main Page{% endblock %}
+{% block page_heading %}MN8 Manage Records{% endblock %}
+
+{% block content %}
+<section class="panel">
+    {% if message %}
+    <div class="notice">{{ message }}</div>
+    {% endif %}
+
+    <div class="stack">
+        <div>
+            <h2>Records</h2>
+            <p class="subtitle">Only records belonging to the authenticated user are shown.</p>
+        </div>
+
+        {% if rows %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Od</th>
+                    <th>Do</th>
+                    <th>link</th>
+                    <th>popis</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td data-label="Od">{{ row['start_at']|datetime_display }}</td>
+                    <td data-label="Do">{{ row['end_at']|datetime_display }}</td>
+                    <td data-label="link"><code>{{ row['link'] }}</code></td>
+                    <td data-label="popis">{{ row['description'] or '' }}</td>
+                    <td data-label="Actions">
+                        <div class="actions">
+                            <a href="{{ url_for('edit_record_view', record_id=row['record_id']) }}">Edit</a>
+                            <a class="secondary" href="{{ url_for('delete_record_view', record_id=row['record_id']) }}">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No records were found for this user.</p>
+        {% endif %}
+
+        <div>
+            <a href="{{ url_for('create_record_view') }}">Create New Item</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}MN8 Manage | Show Info{% endblock %}
+{% block page_heading %}Request Diagnostics{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="stack">
+        <div>
+            <h2>Request Info</h2>
+            <table>
+                {% for key, value in request_info.items() %}
+                <tr>
+                    <th>{{ key }}</th>
+                    <td><code>{{ value if value is not none else '-' }}</code></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <div>
+            <h2>Selected Headers</h2>
+            <table>
+                {% for key, value in selected_headers.items() %}
+                <tr>
+                    <th>{{ key }}</th>
+                    <td><code>{{ value if value is not none else '-' }}</code></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <div>
+            <h2>Query Arguments</h2>
+            {% if query_args %}
+            <table>
+                {% for key, values in query_args %}
+                <tr>
+                    <th>{{ key }}</th>
+                    <td><code>{{ values|join(', ') }}</code></td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <p>No query arguments were provided.</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <h2>WSGI Environment</h2>
+            <table>
+                {% for key, value in environ_info.items() %}
+                <tr>
+                    <th>{{ key }}</th>
+                    <td><code>{{ value if value is not none else '-' }}</code></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <div>
+            <h2>All Request Headers</h2>
+            <table>
+                {% for key, value in all_headers %}
+                <tr>
+                    <th>{{ key }}</th>
+                    <td><code>{{ value }}</code></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}

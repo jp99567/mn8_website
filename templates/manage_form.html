@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}MN8 Manage | {{ page_title }}{% endblock %}
+{% block page_heading %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    {% if errors %}
+    <div class="errors">
+        <strong>Form contains errors:</strong>
+        <ul>
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ form_action }}">
+        <div class="field-grid">
+            <div class="field">
+                <label for="od">Od</label>
+                <input id="od" name="od" type="datetime-local" step="1" required value="{{ form_data['od'] }}">
+            </div>
+
+            <div class="field">
+                <label for="do">Do</label>
+                <input id="do" name="do" type="datetime-local" step="1" required value="{{ form_data['do'] }}">
+            </div>
+        </div>
+
+        {% if link_value %}
+        <div class="field">
+            <label>link</label>
+            <p><code>{{ link_value }}</code></p>
+        </div>
+        {% endif %}
+
+        <div class="field">
+            <label for="popis">popis</label>
+            <textarea id="popis" name="popis">{{ form_data['popis'] }}</textarea>
+        </div>
+
+        <div class="actions">
+            <button type="submit">{{ submit_label }}</button>
+            <a class="secondary" href="{{ cancel_url }}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
