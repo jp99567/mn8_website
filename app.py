@@ -117,6 +117,24 @@ def list_records_for_user(user_name):
     return run_query(query, (user_name,), fetchall=True)
 
 
+def get_row_state(start_at, end_at, reference_time=None):
+    reference_time = reference_time or now_local()
+    if end_at < start_at:
+        return "invalid"
+    if start_at <= reference_time <= end_at:
+        return "active"
+    if reference_time < start_at:
+        return "future"
+    return "past"
+
+
+def annotate_row_states(rows):
+    reference_time = now_local()
+    for row in rows:
+        row["row_state"] = get_row_state(row["start_at"], row["end_at"], reference_time)
+    return rows
+
+
 def get_record_for_user(record_id, user_name):
     query = sql.SQL(
         """
@@ -350,7 +368,7 @@ def manage_index():
     if error_response:
         return error_response
 
-    rows = list_records_for_user(user_name)
+    rows = annotate_row_states(list_records_for_user(user_name))
     return render_template(
         "manage_list.html",
         rows=rows,

@@ -28,7 +28,7 @@
             </thead>
             <tbody>
                 {% for row in rows %}
-                <tr>
+                <tr class="row-state-{{ row['row_state'] }}">
                     <td data-label="Od">{{ row['start_at']|datetime_display }}</td>
                     <td data-label="Do">{{ row['end_at']|datetime_display }}</td>
                     <td data-label="link">
