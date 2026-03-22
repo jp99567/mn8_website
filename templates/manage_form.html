@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}MN8 Manage | {{ page_title }}{% endblock %}
+{% block title %}MN8 Otváranie brány a pavlače | {{ page_title }}{% endblock %}
 {% block page_heading %}{{ page_title }}{% endblock %}
 
 {% block content %}
@@ -11,7 +11,7 @@
 
     {% if warnings %}
     <div class="warnings">
-        <strong>Form contains warnings:</strong>
+        <strong>Please review these warnings:</strong>
         <ul>
             {% for warning in warnings %}
             <li>{{ warning }}</li>
@@ -22,7 +22,7 @@
 
     {% if errors %}
     <div class="errors">
-        <strong>Form contains errors:</strong>
+        <strong>Please fix these errors:</strong>
         <ul>
             {% for error in errors %}
             <li>{{ error }}</li>
@@ -34,12 +34,12 @@
     <form method="post" action="{{ form_action }}">
         <div class="field-grid">
             <div class="field">
-                <label for="od">Od</label>
+                <label for="od">Aktívna od</label>
                 <input id="od" name="od" type="datetime-local" step="1" required value="{{ form_data['od'] }}">
             </div>
 
             <div class="field">
-                <label for="do">Do</label>
+                <label for="do">Aktívna do</label>
                 <input id="do" name="do" type="datetime-local" step="1" required value="{{ form_data['do'] }}">
             </div>
         </div>

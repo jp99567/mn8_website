@@ -92,8 +92,8 @@ def require_current_user():
     if not user_name:
         return None, render_error(
             401,
-            "Authenticated user is missing.",
-            "The application expected nginx to forward X-Authenticated-User."
+            "Authentication information is missing.",
+            "The application expected nginx to forward the authenticated username."
         )
     return user_name, None
 
@@ -284,7 +284,7 @@ def parse_datetime_value(raw_value, label):
     try:
         return datetime.fromisoformat(raw_value)
     except ValueError as exc:
-        raise ValueError(f"Field {label} must be a valid date and time.") from exc
+        raise ValueError(f"Field {label} must contain a valid date and time.") from exc
 
 
 def build_form_data(record=None, submitted=None):
@@ -406,12 +406,12 @@ def inject_navigation_context():
 
 @app.errorhandler(404)
 def not_found(_error):
-    return render_error(404, "Page not found", "The requested page does not exist.")
+    return render_error(404, "Page Not Found", "The requested page does not exist.")
 
 
 @app.errorhandler(RuntimeError)
 def runtime_error(error):
-    return render_error(500, "Configuration error", str(error))
+    return render_error(500, "Configuration Error", str(error))
 
 
 @app.route("/")
@@ -469,11 +469,11 @@ def create_record_view():
                 start_at=start_at.isoformat(sep=" "),
                 end_at=end_at.isoformat(sep=" "),
             )
-            return redirect(url_for("manage_index", message="New item was created."))
+            return redirect(url_for("manage_index", message="Access entry created."))
 
     return render_template(
         "manage_form.html",
-        page_title="Create New Item",
+        page_title="Create New Access",
         submit_label="Create",
         form_action=url_for("create_record_view"),
         form_data=form_data,
@@ -493,7 +493,7 @@ def edit_record_view(record_id):
 
     record = get_record_for_user(record_id, user_name)
     if record is None:
-        return render_error(404, "Record not found", "The selected record does not exist for the authenticated user.")
+        return render_error(404, "Access Record Not Found", "The selected record does not exist or does not belong to the current user.")
 
     form_data = build_form_data(record=record, submitted=request.form)
     errors = []
@@ -513,11 +513,11 @@ def edit_record_view(record_id):
                 start_at=start_at.isoformat(sep=" "),
                 end_at=end_at.isoformat(sep=" "),
             )
-            return redirect(url_for("manage_index", message="Item was updated."))
+            return redirect(url_for("manage_index", message="Access entry updated."))
 
     return render_template(
         "manage_form.html",
-        page_title="Edit Item",
+        page_title="Edit Access",
         submit_label="Save Changes",
         form_action=url_for("edit_record_view", record_id=record_id),
         form_data=form_data,
@@ -537,7 +537,7 @@ def delete_record_view(record_id):
 
     record = get_record_for_user(record_id, user_name)
     if record is None:
-        return render_error(404, "Record not found", "The selected record does not exist for the authenticated user.")
+        return render_error(404, "Access Record Not Found", "The selected record does not exist or does not belong to the current user.")
 
     if request.method == "POST":
         delete_record(record_id, user_name)
@@ -549,7 +549,7 @@ def delete_record_view(record_id):
             start_at=record["start_at"].isoformat(sep=" "),
             end_at=record["end_at"].isoformat(sep=" "),
         )
-        return redirect(url_for("manage_index", message="Item was deleted."))
+        return redirect(url_for("manage_index", message="Access entry deleted."))
 
     return render_template(
         "delete_confirm.html",

@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}MN8 Manage | Delete Item{% endblock %}
-{% block page_heading %}Delete Item{% endblock %}
+{% block title %}MN8 Otváranie brány a pavlače | Delete Access{% endblock %}
+{% block page_heading %}Delete Access{% endblock %}
 
 {% block content %}
 <section class="panel">
     <div class="notice">
-        You are about to delete this record. This action cannot be undone.
+        You are about to delete this access record. This action cannot be undone.
     </div>
 
     <table>
         <tbody>
             <tr>
-                <th>Od</th>
+                <th>Aktívna od</th>
                 <td>{{ record['start_at']|datetime_display }}</td>
             </tr>
             <tr>
-                <th>Do</th>
+                <th>Aktívna do</th>
                 <td>{{ record['end_at']|datetime_display }}</td>
             </tr>
             <tr>
@@ -36,7 +36,7 @@
 
     <form method="post" action="{{ confirm_url }}" style="margin-top: 18px;">
         <div class="actions">
-            <button type="submit">Confirm Delete</button>
+            <button type="submit">Delete Access</button>
             <a class="secondary" href="{{ cancel_url }}">Cancel</a>
         </div>
     </form>

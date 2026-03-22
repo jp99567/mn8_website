@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}MN8 Manage | Show Info{% endblock %}
+{% block title %}MN8 Otváranie brány a pavlače | Request Diagnostics{% endblock %}
 {% block page_heading %}Request Diagnostics{% endblock %}
 
 {% block content %}
@@ -31,7 +31,7 @@
         </div>
 
         <div>
-            <h2>Query Arguments</h2>
+            <h2>Query Parameters</h2>
             {% if query_args %}
             <table>
                 {% for key, values in query_args %}
@@ -42,7 +42,7 @@
                 {% endfor %}
             </table>
             {% else %}
-            <p>No query arguments were provided.</p>
+            <p>No query parameters were provided.</p>
             {% endif %}
         </div>
 
