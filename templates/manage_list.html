@@ -24,6 +24,7 @@
                     <th>link</th>
                     <th></th>
                     <th>popis</th>
+                    <th>Welcome text</th>
                     <th></th>
                 </tr>
             </thead>
@@ -49,6 +50,7 @@
                         >COPY</button>
                     </td>
                     <td data-label="popis">{{ row['description'] or '' }}</td>
+                    <td data-label="Welcome text">{{ row['welcome_text'] or '' }}</td>
                     <td data-label="">
                         <a class="button danger" href="{{ url_for('delete_record_view', record_id=row['record_id']) }}">Delete</a>
                     </td>

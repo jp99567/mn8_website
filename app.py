@@ -23,6 +23,7 @@ USER_COLUMN = "mn8_user"
 FROM_COLUMN = "mn8_from"
 TO_COLUMN = "mn8_to"
 DESCRIPTION_COLUMN = "mn8_desc"
+WELCOME_TEXT_COLUMN = "welcome_text"
 DEFAULT_LOG_FILE = "mn8_manage.log"
 DEFAULT_BRANA_COMMAND = "mosquitto_pub -h linksys -t rb/ctrl/dev/Brana -m 1"
 DEFAULT_PAVLAC_COMMAND = "mosquitto_pub -h linksys -t rb/ctrl/dev/DverePavlac -m 1"
@@ -157,7 +158,8 @@ def list_records_for_user(user_name):
                {from_column} AS start_at,
                {to_column} AS end_at,
                link,
-               {description_column} AS description
+               {description_column} AS description,
+               {welcome_text_column} AS welcome_text
         FROM {table}
         WHERE {user_column} = %s
         ORDER BY {from_column} DESC, {pk} DESC
@@ -168,6 +170,7 @@ def list_records_for_user(user_name):
         from_column=sql.Identifier(FROM_COLUMN),
         to_column=sql.Identifier(TO_COLUMN),
         description_column=sql.Identifier(DESCRIPTION_COLUMN),
+        welcome_text_column=sql.Identifier(WELCOME_TEXT_COLUMN),
         table=get_table_identifier(),
     )
     return run_query(query, (user_name,), fetchall=True)
@@ -199,7 +202,8 @@ def get_record_for_user(record_id, user_name):
                {from_column} AS start_at,
                {to_column} AS end_at,
                link,
-               {description_column} AS description
+               {description_column} AS description,
+               {welcome_text_column} AS welcome_text
         FROM {table}
         WHERE {pk} = %s AND {user_column} = %s
         """
@@ -209,6 +213,7 @@ def get_record_for_user(record_id, user_name):
         from_column=sql.Identifier(FROM_COLUMN),
         to_column=sql.Identifier(TO_COLUMN),
         description_column=sql.Identifier(DESCRIPTION_COLUMN),
+        welcome_text_column=sql.Identifier(WELCOME_TEXT_COLUMN),
         table=get_table_identifier(),
     )
     return run_query(query, (record_id, user_name), fetchone=True)
@@ -252,11 +257,11 @@ def generate_unique_link():
     raise RuntimeError("Failed to generate a unique link after multiple attempts.")
 
 
-def insert_record(user_name, start_at, end_at, description):
+def insert_record(user_name, start_at, end_at, description, welcome_text):
     query = sql.SQL(
         """
-        INSERT INTO {table} ({user_column}, {from_column}, {to_column}, link, {description_column})
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO {table} ({user_column}, {from_column}, {to_column}, link, {description_column}, {welcome_text_column})
+        VALUES (%s, %s, %s, %s, %s, %s)
         RETURNING {pk} AS record_id, link
         """
     ).format(
@@ -266,17 +271,24 @@ def insert_record(user_name, start_at, end_at, description):
         from_column=sql.Identifier(FROM_COLUMN),
         to_column=sql.Identifier(TO_COLUMN),
         description_column=sql.Identifier(DESCRIPTION_COLUMN),
+        welcome_text_column=sql.Identifier(WELCOME_TEXT_COLUMN),
     )
-    return run_query(query, (user_name, start_at, end_at, generate_unique_link(), description), fetchone=True, commit=True)
+    return run_query(
+        query,
+        (user_name, start_at, end_at, generate_unique_link(), description, welcome_text),
+        fetchone=True,
+        commit=True,
+    )
 
 
-def update_record(record_id, user_name, start_at, end_at, description):
+def update_record(record_id, user_name, start_at, end_at, description, welcome_text):
     query = sql.SQL(
         """
         UPDATE {table}
         SET {from_column} = %s,
             {to_column} = %s,
-            {description_column} = %s
+            {description_column} = %s,
+            {welcome_text_column} = %s
         WHERE {pk} = %s AND {user_column} = %s
         """
     ).format(
@@ -286,8 +298,9 @@ def update_record(record_id, user_name, start_at, end_at, description):
         from_column=sql.Identifier(FROM_COLUMN),
         to_column=sql.Identifier(TO_COLUMN),
         description_column=sql.Identifier(DESCRIPTION_COLUMN),
+        welcome_text_column=sql.Identifier(WELCOME_TEXT_COLUMN),
     )
-    run_query(query, (start_at, end_at, description, record_id, user_name), commit=True)
+    run_query(query, (start_at, end_at, description, welcome_text, record_id, user_name), commit=True)
 
 
 def delete_record(record_id, user_name):
@@ -360,11 +373,13 @@ def build_form_data(record=None, submitted=None):
             "od": submitted.get("od", format_datetime_for_input(start_at)),
             "do": submitted.get("do", format_datetime_for_input(end_at)),
             "popis": submitted.get("popis", ""),
+            "welcome_text": submitted.get("welcome_text", ""),
         }
     return {
         "od": submitted.get("od", format_datetime_for_input(record["start_at"])),
         "do": submitted.get("do", format_datetime_for_input(record["end_at"])),
         "popis": submitted.get("popis", record["description"] or ""),
+        "welcome_text": submitted.get("welcome_text", record["welcome_text"] or ""),
     }
 
 
@@ -388,8 +403,9 @@ def validate_form(submitted):
         warnings.append("The end timestamp should be later than the start timestamp.")
 
     description = submitted.get("popis", "").strip()
+    welcome_text = submitted.get("welcome_text", "").strip()
 
-    return errors, warnings, start_at, end_at, description
+    return errors, warnings, start_at, end_at, description, welcome_text
 
 
 def get_form_state(form_data, start_at=None, end_at=None):
@@ -623,10 +639,10 @@ def create_record_view():
     form_state = get_form_state(form_data)
 
     if request.method == "POST":
-        errors, warnings, start_at, end_at, description = validate_form(request.form)
+        errors, warnings, start_at, end_at, description, welcome_text = validate_form(request.form)
         form_state = get_form_state(form_data, start_at, end_at)
         if not errors:
-            created_record = insert_record(user_name, start_at, end_at, description)
+            created_record = insert_record(user_name, start_at, end_at, description, welcome_text)
             log_crud_action(
                 "create",
                 user_name,
@@ -667,10 +683,10 @@ def edit_record_view(record_id):
     form_state = get_form_state(form_data)
 
     if request.method == "POST":
-        errors, warnings, start_at, end_at, description = validate_form(request.form)
+        errors, warnings, start_at, end_at, description, welcome_text = validate_form(request.form)
         form_state = get_form_state(form_data, start_at, end_at)
         if not errors:
-            update_record(record_id, user_name, start_at, end_at, description)
+            update_record(record_id, user_name, start_at, end_at, description, welcome_text)
             log_crud_action(
                 "update",
                 user_name,

@@ -60,6 +60,11 @@
             <textarea id="popis" name="popis">{{ form_data['popis'] }}</textarea>
         </div>
 
+        <div class="field">
+            <label for="welcome_text">Welcome text</label>
+            <textarea id="welcome_text" name="welcome_text">{{ form_data['welcome_text'] }}</textarea>
+        </div>
+
         <div class="actions">
             <button type="submit">{{ submit_label }}</button>
             <a class="button secondary" href="{{ cancel_url }}">Cancel</a>
