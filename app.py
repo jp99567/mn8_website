@@ -2,6 +2,7 @@ import os
 import re
 import secrets
 import string
+import logging
 from datetime import datetime, timedelta
 
 import psycopg
@@ -20,6 +21,28 @@ USER_COLUMN = "mn8_user"
 FROM_COLUMN = "mn8_from"
 TO_COLUMN = "mn8_to"
 DESCRIPTION_COLUMN = "mn8_desc"
+DEFAULT_LOG_FILE = "mn8_manage.log"
+
+
+def create_audit_logger():
+    logger = logging.getLogger("mn8_manage_audit")
+    if logger.handlers:
+        return logger
+
+    log_file_path = os.environ.get("MN8_LOG_FILE", DEFAULT_LOG_FILE)
+    log_directory = os.path.dirname(log_file_path)
+    if log_directory:
+        os.makedirs(log_directory, exist_ok=True)
+
+    handler = logging.FileHandler(log_file_path, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    return logger
+
+
+AUDIT_LOGGER = create_audit_logger()
 
 
 def validate_identifier(identifier):
@@ -91,6 +114,19 @@ def run_query(query, params=None, *, fetchone=False, fetchall=False, commit=Fals
             if commit:
                 connection.commit()
             return result
+
+
+def log_crud_action(action, user_name, **details):
+    safe_details = {
+        key: value for key, value in details.items() if value is not None
+    }
+    details_text = " ".join(
+        f"{key}={safe_details[key]}" for key in sorted(safe_details)
+    )
+    message = f"action={action} user={user_name or '-'}"
+    if details_text:
+        message = f"{message} {details_text}"
+    AUDIT_LOGGER.info(message)
 
 
 def list_records_for_user(user_name):
@@ -178,15 +214,17 @@ def insert_record(user_name, start_at, end_at, description):
         """
         INSERT INTO {table} ({user_column}, {from_column}, {to_column}, link, {description_column})
         VALUES (%s, %s, %s, %s, %s)
+        RETURNING {pk} AS record_id, link
         """
     ).format(
         table=get_table_identifier(),
+        pk=get_primary_key_identifier(),
         user_column=sql.Identifier(USER_COLUMN),
         from_column=sql.Identifier(FROM_COLUMN),
         to_column=sql.Identifier(TO_COLUMN),
         description_column=sql.Identifier(DESCRIPTION_COLUMN),
     )
-    run_query(query, (user_name, start_at, end_at, generate_unique_link(), description), commit=True)
+    return run_query(query, (user_name, start_at, end_at, generate_unique_link(), description), fetchone=True, commit=True)
 
 
 def update_record(record_id, user_name, start_at, end_at, description):
@@ -388,6 +426,13 @@ def manage_index():
         return error_response
 
     rows = annotate_row_states(list_records_for_user(user_name))
+    log_crud_action(
+        "read",
+        user_name,
+        count=len(rows),
+        path=request.path,
+        remote_addr=request.remote_addr,
+    )
     return render_template(
         "manage_list.html",
         rows=rows,
@@ -415,7 +460,15 @@ def create_record_view():
         errors, warnings, start_at, end_at, description = validate_form(request.form)
         form_state = get_form_state(form_data, start_at, end_at)
         if not errors:
-            insert_record(user_name, start_at, end_at, description)
+            created_record = insert_record(user_name, start_at, end_at, description)
+            log_crud_action(
+                "create",
+                user_name,
+                record_id=created_record["record_id"],
+                link=created_record["link"],
+                start_at=start_at.isoformat(sep=" "),
+                end_at=end_at.isoformat(sep=" "),
+            )
             return redirect(url_for("manage_index", message="New item was created."))
 
     return render_template(
@@ -452,6 +505,14 @@ def edit_record_view(record_id):
         form_state = get_form_state(form_data, start_at, end_at)
         if not errors:
             update_record(record_id, user_name, start_at, end_at, description)
+            log_crud_action(
+                "update",
+                user_name,
+                record_id=record_id,
+                link=record["link"],
+                start_at=start_at.isoformat(sep=" "),
+                end_at=end_at.isoformat(sep=" "),
+            )
             return redirect(url_for("manage_index", message="Item was updated."))
 
     return render_template(
@@ -480,6 +541,14 @@ def delete_record_view(record_id):
 
     if request.method == "POST":
         delete_record(record_id, user_name)
+        log_crud_action(
+            "delete",
+            user_name,
+            record_id=record_id,
+            link=record["link"],
+            start_at=record["start_at"].isoformat(sep=" "),
+            end_at=record["end_at"].isoformat(sep=" "),
+        )
         return redirect(url_for("manage_index", message="Item was deleted."))
 
     return render_template(

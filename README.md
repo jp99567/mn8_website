@@ -16,6 +16,7 @@ Server-rendered Flask application for managing user-specific records in PostgreS
 - `MN8_ACCESS_TABLE` defaults to `mn8_brana_access`.
 - `MN8_ACCESS_PK_COLUMN` defaults to `id`. The application aliases this column internally, so the physical column name does not need to be `id`.
 - `MN8_DEV_AUTH_USER` is optional and only intended for local development when nginx is not forwarding `X-Authenticated-User`.
+- `MN8_LOG_FILE` defaults to `mn8_manage.log` and controls where CRUD audit entries are appended.
 - `FLASK_RUN_HOST` defaults to `0.0.0.0`.
 - `FLASK_RUN_PORT` defaults to `5000`.
 - `FLASK_DEBUG` defaults to `1`.
@@ -30,6 +31,7 @@ python3 -m venv .venv
 pip install -r requirements.txt
 export DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DBNAME'
 export MN8_DEV_AUTH_USER='testuser'
+export MN8_LOG_FILE='mn8_manage.log'
 python app.py
 ```
 
@@ -50,3 +52,4 @@ http://127.0.0.1:5000/mn8/manage/show_info
 - The existing PostgreSQL table is assumed to already exist.
 - The application filters rows by the authenticated user forwarded from nginx.
 - Physical database columns are expected to be `mn8_user`, `mn8_from`, `mn8_to`, and `mn8_desc`.
+- CRUD actions are appended to the log file configured by `MN8_LOG_FILE`.
