@@ -171,6 +171,16 @@
             flex-wrap: wrap;
         }
 
+        .copy-button {
+            background: transparent;
+            color: var(--accent-strong);
+        }
+
+        .copy-button.is-copied {
+            background: rgba(13, 106, 91, 0.12);
+            color: var(--accent-strong);
+        }
+
         form {
             margin: 0;
         }
@@ -276,5 +286,32 @@
 
         {% block content %}{% endblock %}
     </div>
+
+    <script>
+        document.addEventListener("click", async function (event) {
+            const button = event.target.closest("[data-copy-text]");
+            if (!button) {
+                return;
+            }
+
+            const originalText = button.dataset.copyLabel || button.textContent.trim();
+            const copyText = button.dataset.copyText;
+
+            try {
+                await navigator.clipboard.writeText(copyText);
+                button.textContent = "COPIED";
+                button.classList.add("is-copied");
+                window.setTimeout(function () {
+                    button.textContent = originalText;
+                    button.classList.remove("is-copied");
+                }, 1200);
+            } catch (_error) {
+                button.textContent = "FAILED";
+                window.setTimeout(function () {
+                    button.textContent = originalText;
+                }, 1200);
+            }
+        });
+    </script>
 </body>
 </html>
