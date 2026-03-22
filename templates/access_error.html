@@ -6,8 +6,23 @@
     <title>{{ title }}</title>
     <style>
         body {
-            background-color: powderblue;
-            font-size: 2em;
+            font-size: 2rem;
+        }
+
+        body.page-state-invalid {
+            background-color: #f8d9d6;
+        }
+
+        body.page-state-active {
+            background-color: #dff2df;
+        }
+
+        body.page-state-future {
+            background-color: #dcecff;
+        }
+
+        body.page-state-past {
+            background-color: #e7e7e7;
         }
 
         hr {
@@ -15,7 +30,7 @@
         }
     </style>
 </head>
-<body>
+<body class="page-state-{{ page_state or 'invalid' }}">
     <h2>Door Opener</h2>
     <hr/>
     <p><strong>{{ title }}</strong></p>

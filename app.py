@@ -464,8 +464,14 @@ def build_access_inactive_detail(record, record_state):
     return "This access link is invalid."
 
 
-def render_access_error(status_code, title, detail):
-    return render_template("access_error.html", title=title, detail=detail, status_code=status_code), status_code
+def render_access_error(status_code, title, detail, page_state="invalid"):
+    return render_template(
+        "access_error.html",
+        title=title,
+        detail=detail,
+        status_code=status_code,
+        page_state=page_state,
+    ), status_code
 
 
 def render_error(status_code, title, detail):
@@ -530,7 +536,7 @@ def public_access(token):
     record = get_record_by_link(token)
     if record is None:
         log_crud_action("access-denied", None, reason="token-not-found", token=token, remote_addr=request.remote_addr)
-        return render_access_error(404, "error", "Access link was not found.")
+        return render_access_error(404, "error", "Access link was not found.", "invalid")
 
     record_state = get_access_record_state(record)
     if record_state != "active":
@@ -546,6 +552,7 @@ def public_access(token):
             403,
             "error",
             build_access_inactive_detail(record, record_state),
+            record_state,
         )
 
     action_message = None
@@ -600,6 +607,7 @@ def public_access(token):
         actions=ACCESS_ACTIONS,
         action_message=action_message,
         action_kind=action_kind,
+        page_state="active",
     )
 
 
