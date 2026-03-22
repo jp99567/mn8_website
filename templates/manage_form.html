@@ -56,12 +56,12 @@
         {% endif %}
 
         <div class="field">
-            <label for="popis">popis</label>
+            <label for="popis">popis <span class="label-note">(Slúži ako poznámka pre správcu. Nezobrazuje sa príjemcovy linky.)</span></label>
             <textarea id="popis" name="popis">{{ form_data['popis'] }}</textarea>
         </div>
 
         <div class="field">
-            <label for="welcome_text">Welcome text</label>
+            <label for="welcome_text">Welcome text <span class="label-note">(Uvítacia správa pre prijímateľa)</span></label>
             <textarea id="welcome_text" name="welcome_text">{{ form_data['welcome_text'] }}</textarea>
         </div>
 
