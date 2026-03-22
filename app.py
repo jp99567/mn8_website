@@ -119,9 +119,9 @@ def list_records_for_user(user_name):
 
 def get_row_state(start_at, end_at, reference_time=None):
     reference_time = reference_time or now_local()
-    if end_at < start_at:
+    if end_at <= start_at:
         return "invalid"
-    if start_at <= reference_time <= end_at:
+    if start_at <= reference_time < end_at:
         return "active"
     if reference_time < start_at:
         return "future"
@@ -268,6 +268,7 @@ def build_form_data(record=None, submitted=None):
 
 def validate_form(submitted):
     errors = []
+    warnings = []
     start_at = None
     end_at = None
 
@@ -281,12 +282,30 @@ def validate_form(submitted):
     except ValueError as exc:
         errors.append(str(exc))
 
-    if start_at and end_at and end_at < start_at:
-        errors.append("Field Do must be later than or equal to Od.")
+    if start_at and end_at and end_at <= start_at:
+        warnings.append("The end timestamp should be later than the start timestamp.")
 
     description = submitted.get("popis", "").strip()
 
-    return errors, start_at, end_at, description
+    return errors, warnings, start_at, end_at, description
+
+
+def get_form_state(form_data, start_at=None, end_at=None):
+    if start_at is not None and end_at is not None:
+        return get_row_state(start_at, end_at)
+
+    raw_start = form_data.get("od")
+    raw_end = form_data.get("do")
+    if not raw_start or not raw_end:
+        return None
+
+    try:
+        parsed_start = datetime.fromisoformat(raw_start)
+        parsed_end = datetime.fromisoformat(raw_end)
+    except ValueError:
+        return None
+
+    return get_row_state(parsed_start, parsed_end)
 
 
 def build_request_details():
@@ -389,9 +408,12 @@ def create_record_view():
 
     form_data = build_form_data(submitted=request.form)
     errors = []
+    warnings = []
+    form_state = get_form_state(form_data)
 
     if request.method == "POST":
-        errors, start_at, end_at, description = validate_form(request.form)
+        errors, warnings, start_at, end_at, description = validate_form(request.form)
+        form_state = get_form_state(form_data, start_at, end_at)
         if not errors:
             insert_record(user_name, start_at, end_at, description)
             return redirect(url_for("manage_index", message="New item was created."))
@@ -402,7 +424,9 @@ def create_record_view():
         submit_label="Create",
         form_action=url_for("create_record_view"),
         form_data=form_data,
+        form_state=form_state,
         errors=errors,
+        warnings=warnings,
         link_value=None,
         cancel_url=url_for("manage_index")
     )
@@ -420,9 +444,12 @@ def edit_record_view(record_id):
 
     form_data = build_form_data(record=record, submitted=request.form)
     errors = []
+    warnings = []
+    form_state = get_form_state(form_data)
 
     if request.method == "POST":
-        errors, start_at, end_at, description = validate_form(request.form)
+        errors, warnings, start_at, end_at, description = validate_form(request.form)
+        form_state = get_form_state(form_data, start_at, end_at)
         if not errors:
             update_record(record_id, user_name, start_at, end_at, description)
             return redirect(url_for("manage_index", message="Item was updated."))
@@ -433,7 +460,9 @@ def edit_record_view(record_id):
         submit_label="Save Changes",
         form_action=url_for("edit_record_view", record_id=record_id),
         form_data=form_data,
+        form_state=form_state,
         errors=errors,
+        warnings=warnings,
         link_value=record["link"],
         cancel_url=url_for("manage_index")
     )

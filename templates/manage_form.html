@@ -4,7 +4,22 @@
 {% block page_heading %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<section class="panel">
+<section class="panel{% if form_state %} row-state-{{ form_state }}{% endif %}">
+    {% if form_state == 'invalid' %}
+    <div class="invalid-hint" style="margin-bottom: 18px;">The end timestamp should be later than the start timestamp.</div>
+    {% endif %}
+
+    {% if warnings %}
+    <div class="warnings">
+        <strong>Form contains warnings:</strong>
+        <ul>
+            {% for warning in warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     {% if errors %}
     <div class="errors">
         <strong>Form contains errors:</strong>

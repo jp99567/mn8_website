@@ -126,6 +126,7 @@
         }
 
         .notice,
+        .warnings,
         .errors {
             margin-bottom: 18px;
             padding: 14px 16px;
@@ -137,11 +138,17 @@
             background: var(--warn-bg);
         }
 
+        .warnings {
+            border: 1px solid var(--warn-line);
+            background: var(--warn-bg);
+        }
+
         .errors {
             border: 1px solid var(--error-line);
             background: var(--error-bg);
         }
 
+        .warnings ul,
         .errors ul {
             margin: 8px 0 0 18px;
             padding: 0;
@@ -195,6 +202,11 @@
         .copy-button.is-copied {
             background: rgba(13, 106, 91, 0.12);
             color: var(--accent-strong);
+        }
+
+        .invalid-hint {
+            color: #9f2f2f;
+            font-weight: 700;
         }
 
         form {
