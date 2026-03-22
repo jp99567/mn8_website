@@ -31,7 +31,11 @@
                 <tr>
                     <td data-label="Od">{{ row['start_at']|datetime_display }}</td>
                     <td data-label="Do">{{ row['end_at']|datetime_display }}</td>
-                    <td data-label="link"><code>{{ row['link'] }}</code></td>
+                    <td data-label="link">
+                        <a class="token-link" href="/mn8/access/{{ row['link'] }}">
+                            <code>{{ row['link'] }}</code>
+                        </a>
+                    </td>
                     <td data-label="popis">{{ row['description'] or '' }}</td>
                     <td data-label="Actions">
                         <div class="actions">

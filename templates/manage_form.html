@@ -32,7 +32,11 @@
         {% if link_value %}
         <div class="field">
             <label>link</label>
-            <p><code>{{ link_value }}</code></p>
+            <p>
+                <a class="token-link" href="/mn8/access/{{ link_value }}">
+                    <code>{{ link_value }}</code>
+                </a>
+            </p>
         </div>
         {% endif %}
 
